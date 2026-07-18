@@ -86,6 +86,8 @@ void PracticeFix::apply(PracticeCheckpoint& cp) {
 }
 
 void PracticeFix::rememberFrame(CheckpointObject* obj, uint64_t attemptStart) {
+    if (!obj) return;
+    
     auto cp = make(obj, attemptStart);
     auto maxFrames = BotOptions::get().practiceFrameBuffer;
     while (frameHistory.size() >= maxFrames) {

@@ -425,9 +425,30 @@ struct BBPlayLayer : Modify<BBPlayLayer, PlayLayer> {
         if (gameObject == m_anticheatSpike) {
             return PlayLayer::destroyPlayer(player, gameObject);
         }
+
+        auto& eng = Engine::get();
+        auto& opt = BotOptions::get();
+
+        if (opt.noclip) {
+            const bool isP1 = player == m_player1;
+            const bool block =
+                (opt.noclipTarget == 0) ||
+                (opt.noclipTarget == 1 && isP1) ||
+                (opt.noclipTarget == 2 && !isP1);
+            if (block) {
+                return;
+            }
+        }
+
         PlayLayer::destroyPlayer(player, gameObject);
-        if (!Engine::get().practice().loadStored) {
-            Engine::get().practice().diedNormally = true;
+
+        if (opt.preventDeath && gameObject != m_anticheatSpike) {
+            eng.ticks().requestBackstep(1);
+            this->processQueuedButtons(0.0f, true);
+        }
+
+        if (!eng.practice().loadStored) {
+            eng.practice().diedNormally = true;
         }
     }
 

@@ -119,12 +119,12 @@ struct BBBaseLayer : Modify<BBBaseLayer, GJBaseGameLayer> {
             case MacroAction::Kind::RestartFull:
                 d.expectsDeath = true;
                 eng.macros().attemptSeed = eng.macros().gameRng();
-                static_cast<PlayLayer*>(this)->fullReset();
+                ((PlayLayer*)this)->fullReset();
                 return;
             case MacroAction::Kind::Restart:
                 d.expectsDeath = true;
                 eng.macros().attemptSeed = eng.macros().gameRng();
-                static_cast<PlayLayer*>(this)->resetLevel();
+                ((PlayLayer*)this)->resetLevel();
                 return;
             case MacroAction::Kind::TpsChange:
                 BotOptions::get().tps = action.tps;

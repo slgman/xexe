@@ -10,6 +10,7 @@
 
 #include "core/engine.hpp"
 #include "macro/macro_engine.hpp"
+#include "practice/practice_fix.hpp"
 #include "util/midhook.hpp"
 
 using namespace geode::prelude;
@@ -139,27 +140,84 @@ static void runAccurateLockDelta(float realDt, std::function<void(float)> update
     auto& driver = eng.ticks();
     auto& opt = BotOptions::get();
 
-    float newTfp = layer->timeForPos(layer->m_player1->m_position, 0,
-                                     layer->m_gameState.m_currentChannel, true, 0);
-    float ssb = std::abs(newTfp - driver.lastTimeForPos);
-    if (ssb <= 0.0f) {
-        ssb = static_cast<float>(driver.physicsDt());
-    }
-    driver.lastTimeForPos = newTfp;
+    auto measureSsb = [&]() -> float {
+        float tfp = layer->timeForPos(layer->m_player1->m_position, 0,
+                                      layer->m_gameState.m_currentChannel, true, 0);
+        float delta = std::abs(tfp - driver.lastTimeForPos);
+        driver.lastTimeForPos = tfp;
+        if (delta <= 0.f) {
+            delta = static_cast<float>(driver.physicsDt());
+        }
+        return delta;
+    };
 
+    auto* pl = PlayLayer::get();
+    const bool liveSsb = opt.ssbFix && pl && !pl->m_isPaused &&
+                         !pl->m_hasCompletedLevel && pl->m_started &&
+                         !pl->m_isPlatformer;
+
+    float ssb = liveSsb ? measureSsb() : static_cast<float>(driver.physicsDt());
     float delta = static_cast<float>(driver.physicsDt());
+
     driver.computeSteps(
         static_cast<float>(realDt * driver.getTimeWarp() * opt.speed), ssb);
 
     driver.shouldDraw = false;
     for (int i = 0; i < driver.remainingSteps - 1; ++i) {
         update(delta);
+        if (liveSsb && pl && !pl->m_hasCompletedLevel && driver.remainingSteps > 0) {
+            ssb = measureSsb();
+            driver.computeSteps(
+                static_cast<float>(realDt * driver.getTimeWarp() * opt.speed), ssb);
+        }
     }
 
     driver.shouldDraw = true;
     if (driver.remainingSteps > 0) {
         update(delta);
     }
+}
+
+void TickDriver::requestBackstep(int frames) {
+    if (frames <= 0) {
+        return;
+    }
+    frameAdvance = true;
+    backstepPending = true;
+    backstepCount = frames;
+}
+
+bool TickDriver::consumeBackstepRequest() {
+    if (!backstepPending) {
+        return false;
+    }
+    backstepPending = false;
+    return true;
+}
+
+static void executeBackstep(int n) {
+    auto* pl = PlayLayer::get();
+    if (!pl) {
+        return;
+    }
+    auto& eng = Engine::get();
+    auto& pf = eng.practice();
+    auto& opt = BotOptions::get();
+    if (!opt.backwardsStepping || !opt.enableFrameHistory) {
+        return;
+    }
+
+    for (int i = 0; i < n - 1 && pf.frameHistory.size() > 1; ++i) {
+        pf.dropNewestFrame();
+    }
+    if (pf.frameHistory.size() <= 1) {
+        return;
+    }
+
+    pf.loadStored = true;
+    pf.backstepping = true;
+    pl->resetLevel();
+    pf.loadStored = false;
 }
 
 void TickDriver::runFrameUpdates(std::function<void(float)> update, float realDt,
@@ -195,6 +253,12 @@ void TickDriver::runFrameUpdates(std::function<void(float)> update, float realDt
             return;
         }
         shouldDraw = true;
+    }
+
+    if (consumeBackstepRequest()) {
+        int n = backstepCount;
+        defer([n](float) { executeBackstep(n); });
+        return;
     }
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -350,10 +414,33 @@ static void onFrameTick(SafetyHookContext&) {
     }
 }
 
+static void onEarlyFrameCapture(SafetyHookContext&) {
+    auto& eng = Engine::get();
+    if (!eng.active() || eng.ticks().refreshOnly) {
+        return;
+    }
+    auto* pl = PlayLayer::get();
+    if (!pl || pl->m_playerDied) {
+        return;
+    }
+    auto& opt = BotOptions::get();
+    if (!opt.enableFrameHistory || !opt.backwardsStepping) {
+        return;
+    }
+
+    CheckpointObject* cp = pl->createCheckpoint();
+    if (!cp) {
+        return;
+    }
+    cp->retain();
+    eng.practice().rememberFrame(cp, eng.ticks().frameAtAttemptStart);
+}
+
 // Windows 2.2074 offsets — re-scan if you retarget another build
 $execute {
     util::installMid(geode::base::get() + 0x237A7C, "physDt", onPhysDt);
     util::installMid(geode::base::get() + 0x237DCE, "stepCount", onStepCount);
     util::installMid(geode::base::get() + 0x238F6E, "restorePhysDt", onRestorePhysDt);
     util::installMid(geode::base::get() + 0x238BAA, "frameTick", onFrameTick);
+    util::installMid(geode::base::get() + 0x237E42, "earlyFrame", onEarlyFrameCapture);
 }

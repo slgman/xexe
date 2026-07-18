@@ -35,6 +35,9 @@ public:
     bool frameAdvance = false;
     bool stepRequest = false;
 
+    bool backstepPending = false;
+    int backstepCount = 1;
+
     void* actionManager = nullptr;
 
     double getTimeWarp() const;
@@ -46,6 +49,9 @@ public:
     void runFrameUpdates(std::function<void(float)> update, float realDt, bool frozen);
     void runDeferredJobs();
     void defer(std::function<void(float)> fn);
+
+    void requestBackstep(int frames = 1);
+    bool consumeBackstepRequest(); // used by deferred path
 
     void applyFps(double fps);
     void syncAudioPitch();

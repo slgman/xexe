@@ -5,6 +5,7 @@
 #include <string>
 
 #include "config/options.hpp"
+#include "practice/practice_fix.hpp"
 #include "core/engine.hpp"
 #include "core/tick_driver.hpp"
 #include "macro/macro_engine.hpp"
@@ -93,6 +94,27 @@ static void drawUi() {
     if (ImGui::Button("Step +1")) {
         d.frameAdvance = true;
         d.stepRequest = true;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Practice");
+    int buf = static_cast<int>(opt.practiceFrameBuffer);
+    if (ImGui::InputInt("Frame history", &buf)) {
+        opt.practiceFrameBuffer = static_cast<uint32_t>(std::max(2, buf));
+    }
+    ImGui::Checkbox("Save frame history", &opt.enableFrameHistory);
+    ImGui::Checkbox("Backwards stepping", &opt.backwardsStepping);
+    ImGui::Checkbox("SSB fix (accurate LD)", &opt.ssbFix);
+    ImGui::Checkbox("Prevent death (backstep)", &opt.preventDeath);
+    ImGui::Checkbox("Noclip", &opt.noclip);
+
+    ImGui::Text("History: %zu", eng.practice().frameHistory.size());
+    if (ImGui::Button("Step -1")) {
+        d.requestBackstep(1);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Step -5")) {
+        d.requestBackstep(5);
     }
 
     ImGui::Separator();

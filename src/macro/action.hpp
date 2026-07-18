@@ -47,7 +47,7 @@ struct MacroAction {
         return a;
     }
 
-    static MacroAction tps(uint32_t frame, double value) {
+    static MacroAction _tps(uint32_t frame, double value) {
         MacroAction a;
         a.frame = frame;
         a.kind = Kind::TpsChange;
