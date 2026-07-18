@@ -1,0 +1,21 @@
+{
+  "geode": "4.4.0",
+  "gd": {
+    "win": "2.2081"
+  },
+  "id": "dev.botbase",
+  "name": "BotBase Template",
+  "version": "v1.0.0",
+  "developer": "you",
+  "description": "Minimal Geometry Dash bot core template (TPS, lock-delta, macro, practice fix).",
+  "tags": ["utility", "gameplay"],
+  "dependencies": {
+    "geode.node-ids": ">=1.17.0",
+    "hjfod.imgui-cocos": ">=v1.0.0"
+  },
+  "resources": {
+    "files": [
+      "resources/Roboto-Regular.ttf"
+    ]
+  }
+}
